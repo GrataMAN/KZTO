@@ -404,6 +404,118 @@
             color: #a0a0a0;
         }
 
+        .saved-calculations {
+            margin-top: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 107, 53, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .saved-item {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ff6b35;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            transform: translateX(0);
+            user-select: none;
+        }
+
+        .saved-item:hover {
+            background: rgba(255, 107, 53, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.2);
+        }
+
+        .saved-item.swiping {
+            transition: none;
+        }
+
+        .saved-item.delete-ready {
+            background: rgba(231, 76, 60, 0.2);
+            border-left-color: #e74c3c;
+        }
+
+        .saved-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .saved-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ff6b35;
+        }
+
+        .saved-date {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+
+        .saved-summary {
+            font-size: 0.95rem;
+            color: #ffffff;
+            line-height: 1.4;
+        }
+
+        .delete-indicator {
+            position: absolute;
+            right: -100px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .saved-item.delete-ready .delete-indicator {
+            right: 20px;
+        }
+
+        .clear-all-btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .clear-all-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -508,10 +620,17 @@
         <div class="results-section">
             <div class="results" id="results"></div>
         </div>
+
+        <div class="saved-calculations" id="savedCalculations" style="display: none;">
+            <h2 class="section-title">Сохраненные расчеты</h2>
+            <button class="clear-all-btn" onclick="clearAllCalculations()">Очистить все расчеты</button>
+            <div id="savedList"></div>
+        </div>
     </div>
 
     <script>
         let details = [];
+        let savedCalculations = [];
         
         // Форматы листов: [длина, ширина, название]
         const sheetFormats = [
@@ -519,6 +638,12 @@
             [2.5, 1.25, "1,25×2,5 м"], 
             [2.0, 1.0, "1,0×2,0 м"]
         ];
+
+        // Загружаем сохраненные расчеты при загрузке страницы
+        window.addEventListener('load', function() {
+            loadSavedCalculations();
+            updateSavedCalculationsDisplay();
+        });
 
         function addDetail() {
             const length = parseFloat(document.getElementById('length').value);
@@ -915,6 +1040,9 @@
             html += '</div>';
             
             resultsElement.innerHTML = html;
+
+            // Сохраняем расчет
+            saveCalculation(calculations, totalArea, totalSheets, totalWasteArea, overallEfficiency);
         }
 
         function createSheetVisualization(layout) {
@@ -1011,6 +1139,218 @@
             return html;
         }
 
+        // Функции для работы с сохраненными расчетами
+        function saveCalculation(calculations, totalArea, totalSheets, totalWasteArea, overallEfficiency) {
+            const calculation = {
+                id: Date.now(),
+                date: new Date().toLocaleString('ru-RU'),
+                details: [...details], // Копируем текущие детали
+                results: calculations,
+                summary: {
+                    totalArea: totalArea,
+                    totalSheets: totalSheets,
+                    totalWasteArea: totalWasteArea,
+                    overallEfficiency: overallEfficiency
+                }
+            };
+
+            savedCalculations.unshift(calculation); // Добавляем в начало массива
+            
+            // Ограничиваем количество сохраненных расчетов (максимум 20)
+            if (savedCalculations.length > 20) {
+                savedCalculations = savedCalculations.slice(0, 20);
+            }
+
+            localStorage.setItem('metalCuttingCalculations', JSON.stringify(savedCalculations));
+            updateSavedCalculationsDisplay();
+        }
+
+        function loadSavedCalculations() {
+            const saved = localStorage.getItem('metalCuttingCalculations');
+            if (saved) {
+                try {
+                    savedCalculations = JSON.parse(saved);
+                } catch (e) {
+                    savedCalculations = [];
+                }
+            }
+        }
+
+        function updateSavedCalculationsDisplay() {
+            const savedSection = document.getElementById('savedCalculations');
+            const savedList = document.getElementById('savedList');
+
+            if (savedCalculations.length === 0) {
+                savedSection.style.display = 'none';
+                return;
+            }
+
+            savedSection.style.display = 'block';
+            
+            let html = '';
+            
+            savedCalculations.forEach((calc, index) => {
+                const detailsCount = calc.details.reduce((sum, detail) => sum + detail.quantity, 0);
+                const detailsText = calc.details.map(d => `${d.length}×${d.width}×${d.quantity}`).join(', ');
+                
+                html += `
+                    <div class="saved-item" data-id="${calc.id}" ontouchstart="handleTouchStart(event)" ontouchmove="handleTouchMove(event)" ontouchend="handleTouchEnd(event)" onmousedown="handleMouseDown(event)" onmousemove="handleMouseMove(event)" onmouseup="handleMouseUp(event)" onclick="loadCalculation(${calc.id})">
+                        <div class="saved-header">
+                            <div class="saved-title">Расчет #${savedCalculations.length - index}</div>
+                            <div class="saved-date">${calc.date}</div>
+                        </div>
+                        <div class="saved-summary">
+                            <div><strong>Деталей:</strong> ${detailsCount} шт (${detailsText.length > 50 ? detailsText.substring(0, 50) + '...' : detailsText})</div>
+                            <div><strong>Листов:</strong> ${calc.summary.totalSheets} шт • <strong>Площадь:</strong> ${calc.summary.totalArea.toFixed(2)} м² • <strong>Эффективность:</strong> ${calc.summary.overallEfficiency.toFixed(1)}%</div>
+                        </div>
+                        <div class="delete-indicator">Удалить</div>
+                    </div>
+                `;
+            });
+
+            if (html === '') {
+                html = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div>Здесь будут отображаться ваши сохраненные расчеты</div>
+                    </div>
+                `;
+            }
+
+            savedList.innerHTML = html;
+        }
+
+        function loadCalculation(id) {
+            const calculation = savedCalculations.find(calc => calc.id === id);
+            if (!calculation) return;
+
+            // Загружаем детали
+            details = [...calculation.details];
+            updateDetailsList();
+
+            // Отображаем результаты
+            displayResults(calculation.results);
+            document.getElementById('results').style.display = 'block';
+
+            // Прокручиваем к результатам
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearAllCalculations() {
+            if (confirm('Вы уверены, что хотите удалить все сохраненные расчеты?')) {
+                savedCalculations = [];
+                localStorage.removeItem('metalCuttingCalculations');
+                updateSavedCalculationsDisplay();
+            }
+        }
+
+        // Переменные для свайпа
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+        let currentElement = null;
+
+        function handleTouchStart(e) {
+            startX = e.touches[0].clientX;
+            currentElement = e.currentTarget;
+            isDragging = true;
+            currentElement.classList.add('swiping');
+        }
+
+        function handleTouchMove(e) {
+            if (!isDragging || !currentElement) return;
+            
+            e.preventDefault();
+            currentX = e.touches[0].clientX;
+            const deltaX = currentX - startX;
+            
+            // Ограничиваем свайп только влево
+            if (deltaX < 0) {
+                const translateX = Math.max(deltaX, -100);
+                currentElement.style.transform = `translateX(${translateX}px)`;
+                
+                // Показываем индикатор удаления при свайпе больше 50px
+                if (Math.abs(translateX) > 50) {
+                    currentElement.classList.add('delete-ready');
+                } else {
+                    currentElement.classList.remove('delete-ready');
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!isDragging || !currentElement) return;
+            
+            const deltaX = currentX - startX;
+            
+            // Если свайп больше 80px влево - удаляем
+            if (deltaX < -80) {
+                deleteCalculation(parseInt(currentElement.dataset.id));
+            } else {
+                // Возвращаем элемент на место
+                currentElement.style.transform = 'translateX(0)';
+                currentElement.classList.remove('delete-ready');
+            }
+            
+            currentElement.classList.remove('swiping');
+            isDragging = false;
+            currentElement = null;
+            startX = 0;
+            currentX = 0;
+        }
+
+        // Поддержка мыши для десктопа
+        function handleMouseDown(e) {
+            startX = e.clientX;
+            currentElement = e.currentTarget;
+            isDragging = true;
+            currentElement.classList.add('swiping');
+            e.preventDefault();
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging || !currentElement) return;
+            
+            currentX = e.clientX;
+            const deltaX = currentX - startX;
+            
+            if (deltaX < 0) {
+                const translateX = Math.max(deltaX, -100);
+                currentElement.style.transform = `translateX(${translateX}px)`;
+                
+                if (Math.abs(translateX) > 50) {
+                    currentElement.classList.add('delete-ready');
+                } else {
+                    currentElement.classList.remove('delete-ready');
+                }
+            }
+        }
+
+        function handleMouseUp(e) {
+            if (!isDragging || !currentElement) return;
+            
+            const deltaX = currentX - startX;
+            
+            if (deltaX < -80) {
+                deleteCalculation(parseInt(currentElement.dataset.id));
+            } else {
+                currentElement.style.transform = 'translateX(0)';
+                currentElement.classList.remove('delete-ready');
+            }
+            
+            currentElement.classList.remove('swiping');
+            isDragging = false;
+            currentElement = null;
+            startX = 0;
+            currentX = 0;
+        }
+
+        function deleteCalculation(id) {
+            savedCalculations = savedCalculations.filter(calc => calc.id !== id);
+            localStorage.setItem('metalCuttingCalculations', JSON.stringify(savedCalculations));
+            updateSavedCalculationsDisplay();
+        }
+
         // Обработка Enter в полях ввода
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -1018,5 +1358,5 @@
             }
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'988330f8a63bd7d5',t:'MTc1OTM5NzUzMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98833775d30c30f3',t:'MTc1OTM5Nzc5OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
